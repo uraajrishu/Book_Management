@@ -1,6 +1,7 @@
 const bookModel = require("../models/bookModel.js");
 const reviewModel = require("../models/reviewModel")
 const userModel = require("../models/userModel")
+const aws = require("../aws/aws.config")
 const  mongoose = require("mongoose");
 
 //---------------------------------------Validadtor------------------------------------------
@@ -35,7 +36,9 @@ const releaseFormat = (releasedAt) => {
 const createBook = async function (req, res) {
     try {
       let requestBody = req.body;
-      let { title, excerpt, userId, ISBN, category, subcategory,reviews, releasedAt } = requestBody;
+     
+      let { title, excerpt, userId, ISBN, category, subcategory,reviews ,releasedAt } = requestBody;
+    
       
       if (!isValidObjectId(userId)) {
         return res.status(400).send({status: false, message: 'Userid is not a valid ObjectId'})
@@ -77,9 +80,21 @@ const createBook = async function (req, res) {
       if (!releaseFormat(releasedAt)) {
         return res.status(400).send({ status: false, message: "Invalid Released Date " });
       }
-   
-      const bookData = {  title, excerpt, userId, ISBN, category, subcategory,reviews, releasedAt };
-      const newBook = await bookModel.create(bookData);
+
+      let files = req.files
+    
+        if (files && files.length > 0) {
+            let uploadedFileURL = await aws.uploadFile(files[0])
+            const uniqueCover = await bookModel.findOne({bookCover:uploadedFileURL})
+        if(uniqueCover) return res.status(400).send({status:false, message:"Book cover already exsits."})
+
+            requestBody['bookCover'] = uploadedFileURL
+        }
+        else {
+           return res.status(400).send({ msg: "No file found"})
+        }
+
+      const newBook = await bookModel.create(requestBody);
       return res.status(201).send({ status: true, message: 'Success', data: newBook });
     } catch (error) {
       return res.status(500).send({ status: false, msg: error.message });
